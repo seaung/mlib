@@ -1,11 +1,39 @@
 package mlib
 
 import (
+	"bytes"
 	"net"
 	"os"
+	"os/exec"
 	"os/user"
 	"runtime"
+	"strings"
 )
+
+func ExecuteCmd(cmd string, options ...string) string {
+	c := exec.Command(cmd, options...)
+
+	output, err := c.CombinedOutput()
+	if err != nil {
+		return ""
+	}
+
+	return string(output)
+}
+
+func ExecuteCmdWithRun(cmd string, options ...string) string {
+	c := exec.Command(cmd, options...)
+
+	var stdout bytes.Buffer
+	c.Stdout = &stdout
+
+	err := c.Run()
+	if err != nil {
+		return ""
+	}
+
+	return stdout.String()
+}
 
 func GetMacAddress() string {
 	interfaces, err := net.Interfaces()
@@ -39,6 +67,31 @@ func GetLocalIP() string {
 			return ipNet.String()
 		}
 	}
+	return "localhost"
+}
+
+func GetInternalIP() string {
+	internals, err := net.Interfaces()
+	if err != nil {
+		return "localhost"
+	}
+
+	for _, inet := range internals {
+		if inet.Flags&net.FlagUp != 0 && !strings.HasPrefix(inet.Name, "lo") {
+			addrs, err := inet.Addrs()
+			if err != nil {
+				continue
+			}
+			for _, addr := range addrs {
+				if ipnet, ok := addr.(*net.IPNet); ok && !ipnet.IP.IsLoopback() {
+					if ipnet.IP.To4() != nil {
+						return ipnet.IP.String()
+					}
+				}
+			}
+		}
+	}
+
 	return "localhost"
 }
 
